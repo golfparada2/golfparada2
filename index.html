@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Golf Paráda v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f0;color:#222;min-height:100vh}
+a{color:#1a7a3a;text-decoration:none;cursor:pointer}
+a:hover{text-decoration:underline}
+#header{background:#1a7a3a;color:white;padding:12px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+#header h1{font-size:1.2rem;font-weight:700;white-space:nowrap}
+#breadcrumb{font-size:0.85rem;opacity:0.85;margin-left:auto}
+#breadcrumb span{cursor:pointer}
+#breadcrumb span:hover{text-decoration:underline}
+#search-wrap{position:absolute;left:50%;transform:translateX(-50%);z-index:101;width:420px}
+#search{padding:6px 16px;border-radius:20px;border:none;outline:none;font-size:0.85rem;width:420px;background:rgba(255,255,255,.25);color:white}
+#search::placeholder{color:rgba(255,255,255,.6)}
+#search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:white;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.2);max-height:400px;overflow-y:auto;z-index:200;display:none}
+#search-results.show{display:block}
+.sr-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee;font-size:0.85rem;color:#222}
+.sr-item:hover{background:#f0f8f4}
+.sr-type{font-size:0.75rem;color:#888;margin-left:6px}
+#app{max-width:1200px;margin:0 auto;padding:20px}
+.panel{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);overflow:hidden}
+.badge{background:#1a7a3a;color:white;border-radius:10px;padding:2px 8px;font-size:0.75rem}
+.star-btn{background:none;border:none;cursor:pointer;font-size:1.1rem;padding:2px;line-height:1}
+.empty-state{padding:24px;text-align:center;color:#aaa;font-size:0.85rem}
+.t-card{background:white;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:14px 16px;margin-bottom:8px;cursor:pointer;transition:box-shadow .15s,transform .1s;display:flex;align-items:center;gap:14px}
+.t-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.12);transform:translateY(-1px)}
+.t-dot{width:10px;height:10px;border-radius:50%;background:#1a7a3a;flex-shrink:0}
+.t-info{flex:1;min-width:0}
+.t-name{font-weight:600;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t-meta{font-size:0.75rem;color:#888;margin-top:2px}
+.t-stats{font-size:0.8rem;color:#555;text-align:right;flex-shrink:0}
+.t-stats strong{color:#1a7a3a;font-size:1rem}
+.t-header{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+.t-title{font-size:1.3rem;font-weight:700;margin-bottom:6px}
+.t-subtitle{color:#666;font-size:0.9rem;display:flex;gap:16px;flex-wrap:wrap}
+.cat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.cat-tab{padding:6px 14px;border-radius:20px;font-size:0.82rem;cursor:pointer;border:1.5px solid #dde8dd;background:white;transition:all .15s;white-space:nowrap}
+.cat-tab:hover{border-color:#1a7a3a;color:#1a7a3a}
+.cat-tab.active{background:#1a7a3a;color:white;border-color:#1a7a3a}
+.results-table{width:100%;border-collapse:collapse;background:white;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.results-table th{background:#f8faf8;padding:10px 12px;text-align:left;font-size:0.78rem;font-weight:600;color:#555;white-space:nowrap;border-bottom:2px solid #e8f0e8}
+.results-table td{padding:9px 12px;border-bottom:1px solid #f0f0f0;font-size:0.85rem}
+.results-table tr:last-child td{border-bottom:none}
+.results-table tr:hover td{background:#f8faf8}
+.row-highlight td{background:#fffde7 !important;border-left:3px solid #f9a825}
+.row-highlight:hover td{background:#fff9c4 !important}
+.pos-badge{display:inline-block;width:28px;height:28px;border-radius:50%;text-align:center;line-height:28px;font-size:0.78rem;font-weight:700}
+.pos-1{background:#FFD700;color:#5a4000}
+.pos-2{background:#C0C0C0;color:#333}
+.pos-3{background:#CD7F32;color:white}
+.pos-other{background:#f0f4f0;color:#555}
+.hcp-change{font-size:0.7rem;margin-left:4px}
+.hcp-down{color:#d32f2f}
+.hcp-up{color:#1a7a3a}
+.score-cell{font-family:monospace;font-weight:600}
+.wd-badge{display:inline-block;background:#ffebee;color:#c62828;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:600}
+.nc-badge{display:inline-block;background:#eef2f7;color:#5a6b80;padding:1px 7px;border-radius:10px;font-size:0.68rem;font-weight:600;vertical-align:middle}
+.player-header{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px;display:flex;align-items:flex-start;gap:16px}
+.player-avatar{width:56px;height:56px;border-radius:50%;background:#1a7a3a;display:flex;align-items:center;justify-content:center;color:white;font-size:1.4rem;font-weight:700;flex-shrink:0}
+.player-name{font-size:1.2rem;font-weight:700}
+.player-club{color:#666;margin-top:4px;font-size:0.9rem}
+.player-hcp{font-size:1.8rem;font-weight:700;color:#1a7a3a;margin-top:6px}
+.player-hcp-label{font-size:0.75rem;color:#888;margin-top:2px}
+.player-stats{display:flex;gap:20px;margin-top:12px;flex-wrap:wrap}
+.player-stat{text-align:center}
+.player-stat strong{display:block;font-size:1.2rem;color:#222}
+.player-stat span{font-size:0.75rem;color:#888}
+.star-btn-lg{margin-left:auto;background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:0.85rem;transition:all .15s}
+.star-btn-lg:hover{border-color:#1a7a3a;color:#1a7a3a}
+.star-btn-lg.starred{background:#fff8e1;border-color:#f9a825;color:#f57f17}
+.chart-card{background:white;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:16px}
+.chart-card h3{font-size:0.9rem;font-weight:600;color:#555;margin-bottom:16px}
+.chart-wrap{height:200px;position:relative}
+.back-btn{background:none;border:1.5px solid #ddd;border-radius:8px;padding:7px 14px;cursor:pointer;font-size:0.82rem;display:inline-flex;align-items:center;gap:6px;margin-bottom:16px;transition:all .15s;color:#444}
+.back-btn:hover{border-color:#1a7a3a;color:#1a7a3a}
+.no-results{padding:40px;text-align:center;color:#aaa;font-size:0.9rem}
+/* Green Jacket portlet */
+.gj-toggle{background:none;border:none;cursor:pointer;font-size:1rem;color:#666;padding:2px 6px;line-height:1;transition:transform .2s;transform-origin:center}
+.gj-toggle.collapsed{transform:rotate(-90deg)}
+.gj-table{width:100%;border-collapse:collapse;font-size:0.84rem}
+.gj-table th{font-size:0.72rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;text-align:left;border-bottom:2px solid #e8f0e8}
+.gj-table th.right,.gj-table td.right{text-align:right}
+.gj-table td{padding:8px 10px;border-bottom:1px solid rgba(0,0,0,.06);vertical-align:middle}
+.gj-table tr:last-child td{border-bottom:none}
+.gj-jacket-icon{filter:brightness(0) saturate(100%) invert(36%) sepia(60%) saturate(700%) hue-rotate(95deg) brightness(0.8);font-size:0.85rem;margin-left:4px}
+.gj-rank{color:#999;font-size:0.78rem;width:22px}
+.gj-name{font-weight:600;cursor:pointer}
+.gj-name:hover{color:#1a7a3a;text-decoration:underline}
+.gj-hcp{font-family:monospace;font-size:0.88rem}
+.gj-pos{color:#c62828;font-weight:600;font-size:0.82rem}
+.gj-neg{color:#1a7a3a;font-weight:600;font-size:0.82rem}
+.gj-zero{color:#aaa;font-size:0.82rem}
+/* Watchlist table */
+.wl-table{width:100%;border-collapse:collapse;table-layout:auto}
+.wl-table th{font-size:0.75rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;padding:6px 10px;text-align:left;border-bottom:2px solid #e8f0e8}
+.wl-table th.right,.wl-table td.right{text-align:right}
+.wl-table td{padding:11px 10px;border-bottom:1px solid #f0f0f0;font-size:0.86rem;vertical-align:middle}
+.wl-table tr:last-child td{border-bottom:none}
+.wl-table tr:hover td{background:#f8faf8;cursor:pointer}
+.wl-table col.wl-star{width:36px}
+.wl-table col.wl-name{width:180px}
+.wl-table col.wl-hcp{width:60px}
+.wl-table col.wl-change{width:75px}
+.wl-table col.wl-last{width:auto}
+.wl-table col.wl-score{width:120px}
+.wl-name-cell{font-weight:600;white-space:nowrap}
+.wl-club-cell{font-size:0.75rem;color:#888;margin-top:2px}
+.wl-hcp-val{font-weight:700;color:#1a7a3a;font-size:0.95rem}
+.wl-hcp-up{color:#2e7d32;font-size:0.78rem;font-weight:600}
+.wl-hcp-down{color:#c62828;font-size:0.78rem;font-weight:600}
+.wl-hcp-same{color:#aaa;font-size:0.78rem}
+.wl-score{font-family:monospace;font-weight:600;font-size:0.88rem;white-space:nowrap}
+.wl-tour-name{font-size:0.8rem;color:#555}
+.wl-tour-date{font-size:0.72rem;color:#aaa;margin-top:2px}
+/* Tournament table */
+.tour-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.tour-table th:nth-child(1){width:42%}
+.tour-table th:nth-child(2){width:38%}
+.tour-table th:nth-child(3){width:11%}
+.tour-table th:nth-child(4){width:9%}
+.tour-table th{font-size:0.75rem;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.04em;padding:6px 10px;text-align:left;border-bottom:2px solid #e8f0e8}
+.tour-table th.right{text-align:right}
+.tour-table td{padding:10px 10px;border-bottom:1px solid #f0f0f0;font-size:0.86rem;vertical-align:middle;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:0}
+.tour-table tr:last-child td{border-bottom:none}
+.tour-table tr:hover td{background:#f8faf8;cursor:pointer}
+/* Dashboard sections */
+.dash-section{background:white;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);padding:16px 18px;margin-bottom:20px;overflow:hidden}
+.dash-section-header{display:flex;align-items:center;gap:8px;font-weight:600;font-size:0.95rem;margin-bottom:14px;color:#222;justify-content:space-between}
+/* Date navigator */
+.date-nav{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.date-nav-btn{background:#f0f4f0;border:none;border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0}
+.date-nav-btn:hover:not(:disabled){background:#d0e4d0;color:#1a7a3a}
+.date-nav-btn:disabled{opacity:0.3;cursor:default}
+.date-nav-label{flex:1;font-weight:600;font-size:0.9rem;display:flex;align-items:center;gap:8px;position:relative}
+.date-nav-text{cursor:pointer;border-radius:6px;padding:2px 6px;transition:background .15s}
+.date-nav-text:hover{background:rgba(26,122,58,.1);text-decoration:underline}
+.date-nav-today{background:none;border:1.5px solid #1a7a3a;color:#1a7a3a;border-radius:8px;padding:4px 12px;cursor:pointer;font-size:0.78rem;transition:all .15s}
+.date-nav-today:hover{background:#1a7a3a;color:white}
+.today-badge{background:#1a7a3a;color:white;border-radius:6px;padding:2px 8px;font-size:0.72rem;font-weight:600;white-space:nowrap}
+/* Scrollable table wrapper */
+.t-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+/* ── Mobile responsive ── */
+@media (max-width:640px) {
+  #header{flex-wrap:wrap;padding:10px 14px;gap:6px}
+  #header h1{font-size:1.05rem}
+  #search-wrap{position:static;transform:none;width:100%;order:3}
+  #search{width:100%;border-radius:8px}
+  #breadcrumb{display:none}
+  #app{padding:10px}
+  #db-info{padding:5px 14px}
+  .dash-section{padding:12px 10px}
+  .t-header{padding:14px}
+  .t-title{font-size:1.1rem}
+  .t-subtitle{flex-direction:column;gap:4px;font-size:0.82rem}
+  .player-header{flex-wrap:wrap;padding:14px;gap:10px}
+  .player-avatar{width:44px;height:44px;font-size:1.1rem}
+  .player-name{font-size:1.05rem}
+  .player-hcp{font-size:1.4rem}
+  .player-stats{gap:12px}
+  .star-btn-lg{margin-left:0;width:100%;justify-content:center;margin-top:4px}
+  .chart-card{padding:14px}
+  .chart-wrap{height:160px}
+  .wl-table col.wl-name{width:130px}
+  .wl-table col.wl-hcp{width:52px}
+  .wl-table col.wl-change{width:56px}
+  .wl-table col.wl-score{width:90px}
+  .wl-tour-name{max-width:110px}
+  .date-nav-label{font-size:0.82rem}
+  .cat-tabs{gap:4px}
+  .cat-tab{padding:5px 10px;font-size:0.78rem}
+  .back-btn{margin-bottom:10px;font-size:0.8rem;padding:6px 12px}
+  .results-table th,.results-table td{padding:7px 8px;font-size:0.8rem}
+  .results-table th{font-size:0.72rem}
+}
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1 style="cursor:pointer" onclick="navigate('dashboard')">&#9971; Golf Paráda v2</h1>
+  </div>
+  <div id="search-wrap">
+    <input type="text" id="search" placeholder="Hledat hráče nebo turnaj…" autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+  <div id="breadcrumb"></div>
+</div>
+<div id="db-info" style="font-size:0.75rem;color:#666;padding:6px 20px;background:#f0f4f0;border-bottom:1px solid #dde8dd;max-width:1200px;margin:0 auto;width:100%;box-sizing:border-box"></div>
+<div id="app"></div>
+<script>
+const _EMBEDDED = null;
+
+// --- Data globals (naplní initData) ---
+let DATA, tournamentMap, categoryMap, resultsByTournament, resultsByPlayer, playerMap;
+
+function initData(d) {
+  DATA = d;
+  // DB info v hlavičce
+  const dates = DATA.tournaments.map(t => t.date).filter(Boolean).sort();
+  if (dates.length > 0) {
+    const fmt = s => { const [y,m,dd] = s.split('-'); return `${dd}.${m}.${y}`; };
+    document.getElementById('db-info').textContent =
+      `data ${fmt(dates[0])} – ${fmt(dates[dates.length-1])}` +
+      (DATA.meta?.updated_at ? ` · aktualizováno ${DATA.meta.updated_at}` : '');
+  }
+  // Indexy
+  tournamentMap = Object.fromEntries(DATA.tournaments.map(t => [t.id, t]));
+  categoryMap   = Object.fromEntries(DATA.categories.map(c => [c.id, c]));
+  resultsByTournament = {};
+  resultsByPlayer = {};
+  DATA.results.forEach(r => {
+    if (!resultsByTournament[r.tournament_id]) resultsByTournament[r.tournament_id] = {};
+    const cats = resultsByTournament[r.tournament_id];
+    if (!cats[r.category_id]) cats[r.category_id] = [];
+    cats[r.category_id].push(r);
+    if (r.golfer_id) {
+      if (!resultsByPlayer[r.golfer_id]) resultsByPlayer[r.golfer_id] = [];
+      resultsByPlayer[r.golfer_id].push(r);
+    }
+  });
+  playerMap = {};
+  DATA.results.forEach(r => {
+    if (r.golfer_id && !playerMap[r.golfer_id]) {
+      playerMap[r.golfer_id] = {id: r.golfer_id, name: r.name, club: r.club, member_no: r.member_no};
+    }
+  });
+}
+
+// State
+let dashDate = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+})();
+let view = 'dashboard';
+let viewParams = {};
+let navHistory = [];
+let watchlist = JSON.parse(localStorage.getItem('golf_watchlist') || '[]');
+
+// ── Zelené sako ─────────────────────────────────────────────────────────────
+const GJ_PLAYERS = [
+  { name: 'Filip Horečný',      hcpJan: 6.7,  tier: 0, member_no: '04400411', keys: ['horecny'] },
+  { name: 'Petr Barton',        hcpJan: 5.6,  tier: 2, member_no: '01000291', keys: ['barton', 'petr'] },
+  { name: 'Tom Ziky Zikmund',   hcpJan: 15.4, tier: 1, member_no: '21800139', keys: ['zikmund'] },
+  { name: 'Jan Rejmon',         hcpJan: 7.7,  tier: 1, member_no: '22000199', keys: ['rejmon', 'jan'] },
+  { name: 'Dada Rejmon',        hcpJan: 20.8, tier: 1,                         keys: ['rejmon', 'david'] },
+  { name: 'Jan Mužík',          hcpJan: 12.2, tier: 0, member_no: '18000980', keys: ['muzik'] },
+  { name: 'Tomas Tesar',        hcpJan: 18.8, tier: 0, member_no: '04800101', keys: ['tesar'] },
+  { name: 'Alexandr Saga Smid', hcpJan: 14.3, tier: 0, member_no: '18006196', keys: ['smid', 'alexandr'] },
+  { name: 'Honza Sommer',       hcpJan: 13.1, tier: 0, member_no: '09801960', keys: ['sommer'] },
+  { name: 'Jozef Banik',        hcpJan: 14.4, tier: 2, member_no: '15400304', keys: ['banik'] },
+  { name: 'Michal Zrzavy',      hcpJan: 7.0,  tier: 1, member_no: '22000070', keys: ['zrzavy'] },
+  { name: 'Ondřej Fatka',       hcpJan: 16.1, tier: 1, member_no: '12503083', keys: ['fatka'] },
+];
+
+function gjNorm(s) {
+  return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
+function gjFindPlayer(p) {
+  // Pokud má member_no, hledej POUZE podle něj — nikdy ne fuzzy fallback
+  if (p.member_no) {
+    for (const [gid, pl] of Object.entries(playerMap)) {
+      if (pl.member_no === p.member_no) return gid;
+    }
+    return null; // správné číslo, ale hráč ještě nemá výsledky v DB
+  }
+  // Bez member_no: fuzzy matching podle jména (jen pro Dada Rejmon)
+  for (const [gid, pl] of Object.entries(playerMap)) {
+    const pn = gjNorm(pl.name);
+    if (p.keys.every(k => pn.includes(k))) return gid;
+  }
+  return null;
+}
+function gjCurrentHcp(gid) {
+  if (!gid) return null;
+  const withHcp = (resultsByPlayer[gid]||[]).filter(r => r.hcp_after != null);
+  if (!withHcp.length) return null;
+  withHcp.sort((a,b) => (tournamentMap[a.tournament_id]?.date||'').localeCompare(tournamentMap[b.tournament_id]?.date||''));
+  return withHcp[withHcp.length-1].hcp_after;
+}
+function renderGJPortlet() {
+  const collapsed = localStorage.getItem('gj_collapsed') === '1';
+  const rows = GJ_PLAYERS.map(p => {
+    const gid = gjFindPlayer(p);
+    const hcpNow = gjCurrentHcp(gid);
+    const delta = hcpNow !== null ? +(hcpNow - p.hcpJan).toFixed(1) : null;
+    const pct = (delta !== null && p.hcpJan !== 0) ? delta / p.hcpJan : null;
+    return {...p, gid, hcpNow, delta, pct};
+  }).sort((a,b) => (a.pct ?? 999) - (b.pct ?? 999));
+
+  const fmtDelta = (v) => {
+    if (v === null) return '<span style="color:#ccc">—</span>';
+    if (Math.abs(v) < 0.05) return '<span class="gj-zero">= 0,0</span>';
+    const s = v > 0 ? '+' : '';
+    return `<span class="${v < 0 ? 'gj-neg' : 'gj-pos'}">${s}${v.toFixed(1)}</span>`;
+  };
+  const fmtPct = (v) => {
+    if (v === null) return '<span style="color:#ccc">—</span>';
+    if (Math.abs(v) < 0.0005) return '<span class="gj-zero">0,000 %</span>';
+    const s = v > 0 ? '+' : '';
+    return `<span class="${v < 0 ? 'gj-neg' : 'gj-pos'}">${s}${(v*100).toFixed(3).replace('.',',')} %</span>`;
+  };
+
+  const gjIcon = '<span class="gj-jacket-icon">🧥</span>';
+  const tRows = rows.map((r,i) => {
+    const icons = gjIcon.repeat(r.tier);
+    const hcpNowColor = r.hcpNow === null ? '#aaa'
+      : r.hcpNow < r.hcpJan ? '#1a7a3a'
+      : r.hcpNow > r.hcpJan ? '#c62828' : '#555';
+    const hcpNowCell = r.hcpNow !== null
+      ? `<span style="font-weight:700;color:${hcpNowColor};font-family:inherit">${r.hcpNow.toFixed(1)}</span>`
+      : `<span style="color:#aaa">—</span>`;
+    const nameAttr = r.gid ? `onclick="navigate('player',{id:'${r.gid}'});event.stopPropagation()"` : '';
+    return `<tr>
+      <td class="gj-rank">${i+1}</td>
+      <td class="gj-name" ${nameAttr}>${r.name}${icons}</td>
+      <td class="right" style="font-weight:700;color:#888;font-family:inherit">${r.hcpJan.toFixed(1)}</td>
+      <td class="right">${hcpNowCell}</td>
+      <td class="right">${fmtDelta(r.delta)}</td>
+      <td class="right">${fmtPct(r.pct)}</td>
+    </tr>`;
+  }).join('');
+
+  const toggleFn = `localStorage.setItem('gj_collapsed',localStorage.getItem('gj_collapsed')==='1'?'0':'1');render()`;
+  return `<div class="dash-section">
+    <div class="dash-section-header"><span><span class="gj-jacket-icon" style="margin-left:0;margin-right:6px">🧥</span>Zelené sako</span>
+      <button class="gj-toggle${collapsed?' collapsed':''}" onclick="${toggleFn}">▼</button>
+    </div>
+    ${collapsed ? '' : `<div class="t-scroll"><table class="gj-table">
+      <thead><tr><th>#</th><th>Golfista</th><th class="right">HCP 1.1.</th><th class="right">HCP nyní</th><th class="right">Δ</th><th class="right">%</th></tr></thead>
+      <tbody>${tRows}</tbody></table></div>`}
+  </div>`;
+}
+let activeChart = null;
+
+function saveWatchlist() { localStorage.setItem('golf_watchlist', JSON.stringify(watchlist)); }
+function isWatched(gid) { return watchlist.includes(gid); }
+function toggleWatch(gid) {
+  if (isWatched(gid)) watchlist = watchlist.filter(id => id !== gid);
+  else watchlist.push(gid);
+  saveWatchlist();
+}
+
+function navigate(v, params={}) {
+  navHistory.push({view, viewParams});
+  view = v; viewParams = params;
+  render();
+  window.scrollTo(0, 0);
+}
+function goBack() {
+  if (navHistory.length > 0) {
+    const prev = navHistory.pop();
+    view = prev.view; viewParams = prev.viewParams;
+    render(); window.scrollTo(0, 0);
+  } else { navigate('dashboard'); }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('cs-CZ', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+}
+function shortDate(dateStr) {
+  if (!dateStr) return '';
+  const [y,m,d] = dateStr.split('-');
+  return `${d}.${m}.${y}`;
+}
+function roundDate(t, round) {
+  const base = t?.date || t?.date_from;
+  if (!base) return '';
+  const rnd = round || 1;
+  if (rnd <= 1) return base;
+  const d = new Date(base + 'T00:00:00');
+  d.setDate(d.getDate() + rnd - 1);
+  return d.toISOString().split('T')[0];
+}
+function hcpDiff(before, after) {
+  if (before == null || after == null) return '';
+  const diff = after - before;
+  if (Math.abs(diff) < 0.05) return '';
+  const sign = diff > 0 ? '+' : '';
+  const cls = diff > 0 ? 'hcp-down' : 'hcp-up';
+  return `<span class="hcp-change ${cls}">${sign}${diff.toFixed(1)}</span>`;
+}
+function posBadge(pos) {
+  const n = parseInt(pos);
+  const cls = n === 1 ? 'pos-1' : n === 2 ? 'pos-2' : n === 3 ? 'pos-3' : 'pos-other';
+  return `<span class="pos-badge ${cls}">${pos || '—'}</span>`;
+}
+function scoreDisplay(r) {
+  if (!r.gross && !r.stableford) return '<span class="wd-badge">WD/NS</span>';
+  const g = r.gross != null ? `${r.gross} ran` : '—';
+  if (r.stableford) return `<span class="score-cell">${g} / ${r.stableford} b.</span>`;
+  if (r.gross) return `<span class="score-cell">${r.gross} ran</span>`;
+  return '—';
+}
+function initials(name) {
+  return name.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase();
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+  const todayStr = new Date().toISOString().split('T')[0];
+  // Rozbal vícedenní turnaje — každý den v rozsahu přidej do množiny dat
+  const dateSet = new Set();
+  DATA.tournaments.forEach(t => {
+    if (t.nc) return;  // nesoutěžní kola se v denním výpisu turnajů nezobrazují
+    const from = t.date || t.date_from;
+    const to = t.date_to || from;
+    if (!from) return;
+    let cur = new Date(from + 'T00:00:00');
+    const end = new Date((to || from) + 'T00:00:00');
+    while (cur <= end) {
+      dateSet.add(cur.toISOString().split('T')[0]);
+      cur.setDate(cur.getDate() + 1);
+    }
+  });
+  const allDates = [...dateSet].sort((a,b) => b.localeCompare(a));
+  if (allDates.length > 0 && !allDates.includes(dashDate)) {
+    dashDate = allDates.find(d => d <= dashDate) || allDates[allDates.length-1];
+  }
+  const prevDate = allDates.find(d => d < dashDate) || null;
+  const nextDate = [...allDates].reverse().find(d => d > dashDate) || null;
+  const isToday = dashDate === todayStr;
+  // Zahrň i vícedenní turnaje kde dashDate spadá do jejich rozsahu
+  const dayTournaments = DATA.tournaments.filter(t => {
+    if (t.nc) return false;  // nesoutěžní kola nejsou turnaje
+    const from = t.date || t.date_from;
+    const to = t.date_to || from;
+    return from && dashDate >= from && dashDate <= (to || from);
+  });
+
+  // WATCHLIST
+  let watchlistHTML;
+  if (watchlist.length === 0) {
+    watchlistHTML = '<div class="empty-state">Žádní sledovaní hráči. Klikněte na ☆ u profilu hráče.</div>';
+  } else {
+    const wlRows = watchlist.map(gid => {
+      const p = playerMap[gid];
+      if (!p) return '';
+      const results = resultsByPlayer[gid] || [];
+      const sortedR = [...results].sort((a,b) => {
+        const da = tournamentMap[a.tournament_id]?.date || tournamentMap[a.tournament_id]?.date_from || '';
+        const db = tournamentMap[b.tournament_id]?.date || tournamentMap[b.tournament_id]?.date_from || '';
+        return da.localeCompare(db);
+      });
+      const lastR = sortedR[sortedR.length - 1];
+      const currentHcp = lastR ? (lastR.hcp_after ?? lastR.hcp_before) : null;
+      const hcpBefore = lastR?.hcp_before;
+      const hcpAfter = lastR?.hcp_after;
+      let hcpChangeHTML = '<span class="wl-hcp-same">—</span>';
+      if (hcpBefore != null && hcpAfter != null) {
+        const diff = hcpAfter - hcpBefore;
+        if (Math.abs(diff) >= 0.05) {
+          const sign = diff > 0 ? '+' : '';
+          const cls = diff < 0 ? 'wl-hcp-up' : 'wl-hcp-down';
+          const arrow = diff < 0 ? '▼' : '▲';
+          hcpChangeHTML = `<span class="${cls}">${arrow} ${sign}${diff.toFixed(1)}</span>`;
+        } else { hcpChangeHTML = '<span class="wl-hcp-same">= 0,0</span>'; }
+      }
+      const lastT = lastR ? tournamentMap[lastR.tournament_id] : null;
+      const lastTDate = lastT ? (lastT.date || lastT.date_from || '') : '';
+      const lastTName = lastT ? lastT.name : '—';
+      let scoreHTML = '<span style="color:#ccc">—</span>';
+      if (lastR) {
+        const g = lastR.gross != null ? lastR.gross : null;
+        const s = lastR.stableford != null ? lastR.stableford : null;
+        if (s != null)         scoreHTML = `<span class="wl-score">${g != null ? g + ' ran' : '—'} / ${s} b.</span>`;
+        else if (g != null)    scoreHTML = `<span class="wl-score">${g} ran</span>`;
+        else if (lastR.result) scoreHTML = `<span class="wd-badge">${lastR.result}</span>`;
+      }
+      return `<tr onclick="navigate('player',{id:'${gid}'})">
+        <td><button class="star-btn" onclick="event.stopPropagation();toggleWatch('${gid}');render()">★</button></td>
+        <td><div class="wl-name-cell">${p.name}</div><div class="wl-club-cell">${p.club || ''}</div></td>
+        <td class="right">${currentHcp != null ? `<span class="wl-hcp-val">${currentHcp.toFixed(1)}</span>` : '—'}</td>
+        <td class="right">${hcpChangeHTML}</td>
+        <td><div class="wl-tour-name">${lastTName}</div><div class="wl-tour-date">${shortDate(lastTDate)}</div></td>
+        <td>${scoreHTML}</td>
+      </tr>`;
+    }).join('');
+    watchlistHTML = `<div class="t-scroll"><table class="wl-table">
+      <colgroup><col class="wl-star"><col class="wl-name"><col class="wl-hcp"><col class="wl-change"><col class="wl-last"><col class="wl-score"></colgroup>
+      <thead><tr><th></th><th>Hráč</th><th class="right">HCP</th><th class="right">Změna</th><th>Poslední kolo</th><th>Rány / Stab.</th></tr></thead>
+      <tbody>${wlRows}</tbody></table></div>`;
+  }
+
+  // TOURNAMENTS
+  let tourHTML;
+  if (dayTournaments.length === 0) {
+    tourHTML = '<div class="empty-state" style="padding:40px 0">Žádné turnaje pro tento den.</div>';
+  } else {
+    const tRows = dayTournaments.map(t => {
+      const cats = resultsByTournament[t.id] || {};
+      const totalResults = Object.values(cats).reduce((s,arr) => s + arr.length, 0);
+      const catCount = Object.keys(cats).length;
+      const from = t.date || t.date_from;
+      const rounds = t.rounds || 1;
+      let roundLabel = '';
+      let roundNum = null;
+      if (rounds > 1 && from) {
+        roundNum = Math.round((new Date(dashDate + 'T00:00:00') - new Date(from + 'T00:00:00')) / 86400000) + 1;
+        roundLabel = ` <span style="color:#888;font-size:0.8rem;font-weight:400">· ${roundNum}. kolo</span>`;
+      }
+      return `<tr onclick="navigate('tournament',{id:'${t.id}'${roundNum ? `,round:${roundNum}` : ''}})" style="cursor:pointer">
+        <td><div class="t-name">${t.name}${roundLabel}</div></td>
+        <td style="color:#666;font-size:0.84rem">${t.venue || '—'}</td>
+        <td style="text-align:right;font-weight:700;color:#1a7a3a">${totalResults}</td>
+        <td style="text-align:right;color:#888;font-size:0.84rem">${catCount}</td>
+      </tr>`;
+    }).join('');
+    tourHTML = `<div class="t-scroll"><table class="tour-table">
+      <thead><tr><th>Turnaj</th><th>Hřiště</th><th class="right">Hráči</th><th class="right">Kat.</th></tr></thead>
+      <tbody>${tRows}</tbody></table></div>`;
+  }
+
+  const wlCollapsed = localStorage.getItem('wl_collapsed') === '1';
+  const tourCollapsed = localStorage.getItem('tour_collapsed') === '1';
+  const wlToggleFn = `localStorage.setItem('wl_collapsed',localStorage.getItem('wl_collapsed')==='1'?'0':'1');render()`;
+  const tourToggleFn = `localStorage.setItem('tour_collapsed',localStorage.getItem('tour_collapsed')==='1'?'0':'1');render()`;
+
+  const displayDate = formatDate(dashDate);
+  document.getElementById('app').innerHTML = `
+    ${renderGJPortlet()}
+    <div class="dash-section">
+      <div class="dash-section-header">
+        <span>&#11088; Sledovaní hráči <span class="badge">${watchlist.length}</span></span>
+        <button class="gj-toggle${wlCollapsed?' collapsed':''}" onclick="${wlToggleFn}">▼</button>
+      </div>
+      ${wlCollapsed ? '' : watchlistHTML}
+    </div>
+    <div class="dash-section">
+      <div class="dash-section-header">
+        <span>&#128197; Turnaje</span>
+        <button class="gj-toggle${tourCollapsed?' collapsed':''}" onclick="${tourToggleFn}">▼</button>
+      </div>
+      ${tourCollapsed ? '' : `<div class="date-nav">
+        <button class="date-nav-btn" onclick="dashDate='${prevDate||dashDate}';render()" ${!prevDate?'disabled':''}>&#8592;</button>
+        <div class="date-nav-label">
+          <label class="date-nav-text" for="datePicker" title="Vybrat datum" style="cursor:pointer;display:inline-block"
+            onclick="var i=document.getElementById('datePicker');if(i.showPicker){event.preventDefault();i.showPicker()}">
+            &#128197; ${displayDate}
+          </label>
+          <input type="date" id="datePicker" value="${dashDate}" onchange="dashDate=this.value;render()" style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none">
+          ${isToday ? '<span class="today-badge">dnes</span>' : ''}
+        </div>
+        <button class="date-nav-btn" onclick="dashDate='${nextDate||dashDate}';render()" ${!nextDate?'disabled':''}>&#8594;</button>
+        ${!isToday && allDates.includes(todayStr) ? `<button class="date-nav-today" onclick="dashDate='${todayStr}';render()">Dnes</button>` : ''}
+      </div>
+      <div style="color:#888;font-size:0.82rem;margin-bottom:12px">${dayTournaments.length} turnaj${dayTournaments.length === 1 ? '' : dayTournaments.length < 5 ? 'e' : 'ů'}</div>
+      ${tourHTML}`}
+    </div>`;
+  document.getElementById('breadcrumb').innerHTML = `<span onclick="navigate('dashboard')">Přehled</span>`;
+}
+
+// ==================== TOURNAMENT ====================
+function renderTournament() {
+  const tid = viewParams.id;
+  const t = tournamentMap[tid];
+  if (!t) { navigate('dashboard'); return; }
+  const cats = resultsByTournament[tid] || {};
+  const catIds = Object.keys(cats);
+  const activeCat = viewParams.cat || catIds[0];
+  const filterRound = viewParams.round ? parseInt(viewParams.round) : null;
+  const tabsHTML = catIds.map(cid => {
+    const cat = categoryMap[cid];
+    const name = cat ? cat.name : cid;
+    const catRows = (cats[cid] || []).filter(r => !filterRound || (r.round||1) === filterRound);
+    return `<button class="cat-tab ${cid === activeCat ? 'active' : ''}"
+      onclick="navigate('tournament',{id:'${tid}',cat:'${cid}',round:${filterRound||'null'},highlight:'${viewParams.highlight||''}'})">${name} <span style="opacity:.7">(${catRows.length})</span></button>`;
+  }).join('');
+  const rows = (cats[activeCat] || [])
+    .filter(r => !filterRound || (r.round||1) === filterRound)
+    .slice().sort((a,b) => (parseInt(a.pos)||9999) - (parseInt(b.pos)||9999));
+  const hasGross = rows.some(r => r.gross != null);
+  const hasStab  = rows.some(r => r.stableford != null);
+  const highlight = viewParams.highlight ? decodeURIComponent(viewParams.highlight) : null;
+  const tableRows = rows.map(r => {
+    const isHL = highlight && (r.golfer_id === highlight || r.name === highlight);
+    const grossCell = hasGross ? `<td style="text-align:right">${r.gross != null ? r.gross + ' ran' : '—'}</td>` : '';
+    const stabCell  = hasStab  ? `<td style="text-align:right">${r.stableford != null ? r.stableford + ' b.' : '—'}</td>` : '';
+    return `<tr class="${isHL ? 'row-highlight' : ''}">
+      <td>${posBadge(r.pos)}</td>
+      <td><a onclick="navigate('player',{id:'${r.golfer_id||''}',name:'${encodeURIComponent(r.name)}'});event.preventDefault()">${r.name}${isHL?' 👤':''}</a>${r.cgf_golfer_id ? ` <a href="https://www.cgf.cz/cz/turnaje/turnaje-vyhledavani/turnaj/vysledkova-listina-hrace?id=${tid}&categoryId=${activeCat}&golferId=${r.cgf_golfer_id}" target="_blank" rel="noopener" style="color:#bbb;font-size:0.8rem;text-decoration:none" onmouseover="this.style.color='#1a7a3a'" onmouseout="this.style.color='#bbb'">&#8599;</a>` : ''}</td>
+      <td style="color:#888">${r.club || ''}</td>
+      <td>${r.hcp_before != null ? r.hcp_before.toFixed(1) : '—'}</td>
+      ${grossCell}${stabCell}
+      <td>${r.hcp_after != null ? r.hcp_after.toFixed(1) : '—'}${hcpDiff(r.hcp_before, r.hcp_after)}</td>
+    </tr>`;
+  }).join('');
+  const colCount = 4 + (hasGross ? 1 : 0) + (hasStab ? 1 : 0) + 1;
+  const totalResults = Object.values(cats).reduce((s,arr) => s + arr.length, 0);
+  document.getElementById('app').innerHTML = `
+    <button class="back-btn" onclick="navigate('dashboard')">&#8592; Zpět na přehled</button>
+    <div class="t-header">
+      <div class="t-title">${t.name}${filterRound && t.rounds > 1 ? ` <span style="font-weight:400;color:#888;font-size:1rem">– ${filterRound}. kolo</span>` : ''}</div>
+      <div class="t-subtitle">
+        <span>&#128205; ${t.venue || '—'}</span>
+        <span>&#128197; ${formatDate(filterRound ? roundDate(t, filterRound) : (t.date || t.date_from))}</span>
+        <span>&#127955; ${totalResults} hráčů</span>
+        <span>&#128203; ${catIds.length} kategorií</span>
+      </div>
+    </div>
+    <div class="cat-tabs">${tabsHTML}</div>
+    <div class="t-scroll"><table class="results-table">
+      <thead><tr>
+        <th>#</th><th>Hráč</th><th>Klub</th><th>HCP</th>
+        ${hasGross ? '<th style="text-align:right">Rány</th>' : ''}
+        ${hasStab  ? '<th style="text-align:right">Stab.</th>' : ''}
+        <th>HCP po</th>
+      </tr></thead>
+      <tbody>${tableRows || `<tr><td colspan="${colCount}" class="no-results">Žádné výsledky</td></tr>`}</tbody>
+    </table></div>`;
+  document.getElementById('breadcrumb').innerHTML =
+    `<span onclick="navigate('dashboard')" style="cursor:pointer">Přehled</span> / ${t.name}`;
+  if (highlight) {
+    setTimeout(() => {
+      const hl = document.querySelector('.row-highlight');
+      if (hl) hl.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 80);
+  }
+}
+
+// ==================== PLAYER ====================
+function renderPlayer() {
+  const gid = viewParams.id;
+  const pname = viewParams.name ? decodeURIComponent(viewParams.name) : null;
+  let allResults = [];
+  if (gid && resultsByPlayer[gid]) allResults = resultsByPlayer[gid];
+  else if (pname) allResults = DATA.results.filter(r => r.name === pname);
+
+  if (allResults.length === 0) {
+    document.getElementById('app').innerHTML = `<button class="back-btn" onclick="goBack()">&#8592; Zpět</button><div class="no-results">Hráč nenalezen nebo žádné výsledky.</div>`;
+    return;
+  }
+  const player = allResults[0];
+  const playerName = player.name;
+  const playerClub = player.club;
+  const playerId = player.golfer_id || gid;
+
+  const sortedResults = [...allResults].sort((a, b) => {
+    const da = tournamentMap[b.tournament_id]?.date || tournamentMap[b.tournament_id]?.date_from || '';
+    const db = tournamentMap[a.tournament_id]?.date || tournamentMap[a.tournament_id]?.date_from || '';
+    return da.localeCompare(db);
+  });
+  // Deduplikace: pro každý (turnaj, kolo) vyber nejlepší kategorii
+  // Priorita: 1) má stableford, 2) první v pořadí
+  const bestPerKey = {};
+  sortedResults.forEach(r => {
+    const key = r.tournament_id + '|' + (r.round || 1);
+    if (!bestPerKey[key]) bestPerKey[key] = r;
+    else if (bestPerKey[key].stableford == null && r.stableford != null) bestPerKey[key] = r;
+  });
+  const deduped = sortedResults.filter(r => bestPerKey[r.tournament_id + '|' + (r.round||1)] === r);
+
+  // Poslední kolo každého turnaje — pro graf HCP
+  const lastRoundPerT = {};
+  deduped.forEach(r => {
+    const prev = lastRoundPerT[r.tournament_id];
+    if (!prev || (r.round||1) > (prev.round||1)) lastRoundPerT[r.tournament_id] = r;
+  });
+  const lastRounds = Object.values(lastRoundPerT).sort((a,b) => {
+    const da = tournamentMap[a.tournament_id]?.date || tournamentMap[a.tournament_id]?.date_from || '';
+    const db = tournamentMap[b.tournament_id]?.date || tournamentMap[b.tournament_id]?.date_from || '';
+    return da.localeCompare(db);
+  });
+  const hcpPoints = lastRounds.filter(r => r.hcp_after != null).map(r => ({
+    label: shortDate(roundDate(tournamentMap[r.tournament_id], r.round)) + ' ' + (tournamentMap[r.tournament_id]?.name || '').substring(0,20),
+    hcp: r.hcp_after
+  }));
+  const lastR = lastRounds[lastRounds.length-1];
+  const currentHcp = lastR?.hcp_after ?? lastR?.hcp_before;
+  const currentYear = new Date().getFullYear();
+  const jan1 = `${currentYear}-01-01`;
+  // Nejstarší výsledek tohoto roku (deduped je newest-first, proto reverse)
+  const firstThisYear = [...deduped].reverse().find(r => {
+    const d = tournamentMap[r.tournament_id]?.date || tournamentMap[r.tournament_id]?.date_from || '';
+    return d >= jan1;
+  });
+  let hcpJan1 = firstThisYear?.hcp_before ?? null;
+  if (hcpJan1 == null) {
+    // Záloha: poslední výsledek předchozího roku
+    const lastPrevYear = deduped.find(r => {
+      const d = tournamentMap[r.tournament_id]?.date || tournamentMap[r.tournament_id]?.date_from || '';
+      return d < jan1;
+    });
+    hcpJan1 = lastPrevYear?.hcp_after ?? null;
+  }
+  const hcpMin = hcpPoints.length ? Math.min(...hcpPoints.map(p => p.hcp)) : 0;
+  const hcpMax = hcpPoints.length ? Math.max(...hcpPoints.map(p => p.hcp)) : 54;
+  const isWatchedPlayer = playerId && isWatched(playerId);
+  const bestStab = Math.max(0, ...allResults.filter(r=>r.stableford).map(r=>r.stableford));
+  const bestPos = Math.min(9999, ...allResults.filter(r=>r.pos).map(r=>parseInt(r.pos)||9999));
+  const roundsCount = deduped.length;
+
+  const tableRows = deduped.map(r => {
+    const t = tournamentMap[r.tournament_id];
+    const cat = categoryMap[r.category_id];
+    const rnd = r.round || 1;
+    const roundLabel = (t?.rounds || 1) > 1 ? ` · ${rnd}. kolo` : '';
+    const ncBadge = t?.nc ? ' <span class="nc-badge">nesoutěžní</span>' : '';
+    return `<tr>
+      <td style="color:#888;font-size:0.8rem">${shortDate(roundDate(t, rnd))}</td>
+      <td><a onclick="navigate('tournament',{id:'${r.tournament_id}',cat:'${r.category_id}',round:${rnd},highlight:'${playerId||encodeURIComponent(playerName)}'});event.preventDefault()">${t?.name||r.tournament_id}${roundLabel}</a>${ncBadge}</td>
+      <td style="font-size:0.8rem;color:#888">${t?.venue||'—'}</td>
+      <td style="font-size:0.8rem;color:#888">${cat?.name||''}</td>
+      <td>${posBadge(r.pos)}</td>
+      <td>${r.hcp_before!=null?r.hcp_before.toFixed(1):'—'}</td>
+      <td>${scoreDisplay(r)}</td>
+      <td>${r.hcp_after!=null?r.hcp_after.toFixed(1):'—'}${hcpDiff(r.hcp_before,r.hcp_after)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <button class="back-btn" onclick="goBack()">&#8592; Zpět</button>
+    <div class="player-header">
+      <div class="player-avatar">${initials(playerName)}</div>
+      <div style="flex:1">
+        <div class="player-name">${playerName}</div>
+        <div class="player-club">${playerClub || '—'} ${player.member_no ? '· č.'+player.member_no : ''}</div>
+        ${(currentHcp != null || hcpJan1 != null) ? `<div style="display:flex;gap:24px;align-items:flex-end;margin-top:6px;flex-wrap:wrap">
+          ${currentHcp != null ? `<div><div class="player-hcp">${currentHcp.toFixed(1)}</div><div class="player-hcp-label">Aktuální HCP</div></div>` : ''}
+          ${hcpJan1 != null ? `<div><div class="player-hcp" style="font-size:1.3rem;color:#555">${hcpJan1.toFixed(1)}</div><div class="player-hcp-label">HCP k 1.1.${currentYear}</div></div>` : ''}
+        </div>` : ''}
+        <div class="player-stats">
+          <div class="player-stat"><strong>${roundsCount}</strong><span>kol</span></div>
+          ${bestStab > 0 && bestStab < 9999 ? `<div class="player-stat"><strong>${bestStab} b.</strong><span>nejlepší stab.</span></div>` : ''}
+          ${bestPos < 9999 ? `<div class="player-stat"><strong>${bestPos}. místo</strong><span>nejlepší výsl.</span></div>` : ''}
+        </div>
+      </div>
+      ${playerId ? `<button class="star-btn-lg ${isWatchedPlayer?'starred':''}" onclick="toggleWatch('${playerId}');render()">
+        ${isWatchedPlayer ? '&#9733; Sledováno' : '&#9734; Sledovat'}
+      </button>` : ''}
+    </div>
+    ${hcpPoints.length > 1 ? `<div class="chart-card"><h3>&#128200; Vývoj handicapu</h3><div class="chart-wrap"><canvas id="hcpChart"></canvas></div></div>` : ''}
+    <div class="panel" style="margin-bottom:0">
+      <div style="padding:14px 16px;background:#f8faf8;border-bottom:1px solid #e8f0e8;font-weight:600;font-size:0.9rem">&#128203; Výsledky (${deduped.length})</div>
+      <div class="t-scroll"><table class="results-table">
+        <thead><tr><th>Datum</th><th>Turnaj</th><th>Hřiště</th><th>Kategorie</th><th>#</th><th>HCP</th><th>Skóre</th><th>HCP po</th></tr></thead>
+        <tbody>${tableRows || '<tr><td colspan="8" class="no-results">Žádné výsledky</td></tr>'}</tbody>
+      </table></div>
+    </div>`;
+  document.getElementById('breadcrumb').innerHTML = `<span onclick="navigate('dashboard')">Přehled</span> / ${playerName}`;
+
+  if (hcpPoints.length > 1) {
+    if (activeChart) { activeChart.destroy(); activeChart = null; }
+    const ctx = document.getElementById('hcpChart');
+    const labels = hcpPoints.map(p => p.label);
+    const hcpData = hcpPoints.map(p => p.hcp);
+    activeChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{label:'HCP',data:hcpData,borderColor:'#1a7a3a',backgroundColor:'rgba(26,122,58,.1)',borderWidth:2.5,pointRadius:5,pointBackgroundColor:'#1a7a3a',tension:0.3,fill:true}] },
+      options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales: { y:{min:hcpMin-1,max:hcpMax+1,ticks:{font:{size:11}},grid:{color:'rgba(0,0,0,.06)'}}, x:{ticks:{font:{size:10},maxRotation:30},grid:{display:false}} } }
+    });
+  }
+}
+
+// ==================== SEARCH ====================
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+
+// Odstraní diakritiku: "Novák" → "novak"
+function stripDiacritics(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
+searchInput.addEventListener('input', () => {
+  const raw = searchInput.value.trim();
+  const q = stripDiacritics(raw);
+  if (q.length < 2) { searchResults.classList.remove('show'); return; }
+
+  // Hráči — deduplikace, bez diakritiky, slova v libovolném pořadí
+  const qWords = q.split(/\s+/).filter(Boolean);
+  const seen = new Set();
+  const players = DATA.results.filter(r => {
+    if (!r.name) return false;
+    const sn = stripDiacritics(r.name);
+    if (!qWords.every(w => sn.includes(w))) return false;
+    const key = r.golfer_id || r.name;
+    if (seen.has(key)) return false;
+    seen.add(key); return true;
+  }).slice(0, 20);
+
+  // Turnaje — bez diakritiky, slova v libovolném pořadí
+  const tourHits = DATA.tournaments.filter(t => {
+    if (t.nc) return false;  // nesoutěžní kola nejsou samostatné turnaje ve vyhledávání
+    const sn = stripDiacritics(t.name);
+    return qWords.every(w => sn.includes(w));
+  }).slice(0, 5);
+
+  searchResults.innerHTML = '';
+  if (players.length === 0 && tourHits.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sr-item'; empty.style.color = '#aaa'; empty.textContent = 'Nic nenalezeno';
+    searchResults.appendChild(empty);
+  } else {
+    tourHits.forEach(t => {
+      const div = document.createElement('div');
+      div.className = 'sr-item';
+      div.innerHTML = '&#127942; <strong>' + t.name + '</strong> <span class="sr-type">' + shortDate(t.date||t.date_from) + '</span>';
+      div.onclick = () => { searchResults.classList.remove('show'); searchInput.value = ''; navigate('tournament', {id: t.id}); };
+      searchResults.appendChild(div);
+    });
+    players.forEach(r => {
+      // Aktuální HCP z posledního výsledku hráče
+      const gid = r.golfer_id;
+      let hcpStr = '';
+      if (gid && resultsByPlayer[gid]) {
+        const sorted = [...resultsByPlayer[gid]].sort((a,b) => {
+          const da = tournamentMap[a.tournament_id]?.date || '';
+          const db = tournamentMap[b.tournament_id]?.date || '';
+          return da.localeCompare(db);
+        });
+        const last = sorted[sorted.length - 1];
+        const hcp = last?.hcp_after ?? last?.hcp_before;
+        if (hcp != null) hcpStr = ' · HCP ' + hcp.toFixed(1);
+      }
+      const div = document.createElement('div');
+      div.className = 'sr-item';
+      div.innerHTML = '&#127955; <strong>' + r.name + '</strong> <span class="sr-type">' + (r.club||'') + hcpStr + '</span>';
+      div.onclick = () => { searchResults.classList.remove('show'); searchInput.value = ''; navigate('player', {id: r.golfer_id||'', name: encodeURIComponent(r.name)}); };
+      searchResults.appendChild(div);
+    });
+  }
+  searchResults.classList.add('show');
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-wrap')) searchResults.classList.remove('show');
+});
+
+// ==================== RENDER ====================
+function render() {
+  if (activeChart) { activeChart.destroy(); activeChart = null; }
+  if (view === 'dashboard') renderDashboard();
+  else if (view === 'tournament') renderTournament();
+  else if (view === 'player') renderPlayer();
+}
+
+function startApp(d) {
+  initData(d);
+  render();
+}
+
+if (_EMBEDDED) {
+  startApp(_EMBEDDED);
+} else {
+  document.getElementById('app').innerHTML =
+    '<div style="text-align:center;padding:60px 20px;color:#888;font-size:1rem">⏳ Načítám data...</div>';
+  fetch('data.json')
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(startApp)
+    .catch(() => {
+      document.getElementById('app').innerHTML =
+        '<div style="text-align:center;padding:60px 20px;color:#c00">⚠️ Chyba načítání dat. Zkuste obnovit stránku.</div>';
+    });
+}
+</script>
+</body>
+</html>

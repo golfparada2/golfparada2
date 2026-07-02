@@ -1,0 +1,19 @@
+# Databáze a logy — lokální, nenahrávat na GitHub
+*.db
+*.db-journal
+*.log
+
+# Debug soubory
+debug_*.txt
+debug_*.html
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Interní soubor — na web jde jen index.html
+golf_prototype.html
